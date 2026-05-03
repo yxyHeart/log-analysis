@@ -1,0 +1,44 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude Code
+.claude/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- logscope ---
+logscope/node_modules/
+logscope/.next/
+logscope/out/
+logscope/build/
+logscope/.vercel/
+logscope/coverage/
+logscope/*.tsbuildinfo
+
+# --- rag-service ---
+rag-service/.venv/
+rag-service/chroma_data/
+rag-service/uploads/
+rag-service/__pycache__/
+rag-service/**/__pycache__/
+rag-service/*.pyc
+
+# --- Docker volumes (local) ---
+rag-model-cache/
