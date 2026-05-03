@@ -4,18 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Workspace Layout
 
-- `logscope/` — Main app: AI-powered log analysis tool (Next.js 16 + Vercel AI SDK v6). See `logscope/CLAUDE.md` for breaking-change notes and details.
-- `rag-service/` — Python FastAPI microservice for RAG (knowledge base). Uses sentence-transformers + ChromaDB. See below.
+- `src/` — Main app: AI-powered log analysis tool (Next.js 16 + Vercel AI SDK v6)
+- `rag-service/` — Python FastAPI microservice for RAG (knowledge base). Uses sentence-transformers + ChromaDB.
 - `docs/superpowers/specs/` — Product design specs in Chinese (architecture, UI/UX, validation criteria)
 
-## Working in logscope/
+## Breaking-Change Notes
 
-Always read `logscope/CLAUDE.md` before making changes — it documents breaking-change notes for Next.js 16, AI SDK v6, Tailwind v4, React 19, and Zod v4.
+This project uses versions with breaking changes from what training data may suggest. Always check before using patterns from older versions:
 
-### Commands
+- **Next.js 16** — Read `node_modules/next/dist/docs/` before using unfamiliar APIs. This version has breaking changes from Next.js 14/15.
+- **Vercel AI SDK v6** — Use `createOpenAI()` / `createAnthropic()` for provider instances (not `openai()` directly). The analyze API uses `generateObject` (not `streamObject`). The chat API uses `streamText` with `.toTextStreamResponse()`.
+- **Tailwind CSS v4** — Uses `@import "tailwindcss"` syntax and `@theme inline` for custom tokens (no `tailwind.config.js`).
+- **React 19** — No legacy context patterns.
+- **Zod v4** — Bundled with AI SDK, used for structured output schema in analyze API.
+
+## Commands
 
 ```bash
-cd logscope
 npm run dev      # Dev server on port 3000
 npm run build    # Production build (includes type-check)
 npm run start    # Start production server
@@ -24,9 +29,9 @@ npm run lint     # ESLint
 
 No test framework is configured yet.
 
-### Key Architecture
+## Key Architecture
 
-Source lives under `logscope/src/` (not `logscope/` root — the app uses `src/` directory structure). Path alias `@/*` maps to `./src/*`.
+Source lives under `src/` with path alias `@/*` mapping to `./src/*`.
 
 ```
 Raw log text → detector.ts → parser.ts → splitter.ts → /api/analyze (generateObject) → AnalysisPanel
@@ -48,18 +53,18 @@ Raw log text → detector.ts → parser.ts → splitter.ts → /api/analyze (gen
 
 **UI:** Single-page app in `page.tsx` with two view modes (`input` / `analysis`). All state in React hooks. Settings (provider, model, API key, baseUrl) persist to localStorage. Components: `LogInput`, `LogViewer`, `AnalysisPanel`, `ChatPanel`, `TimelineView`, `KnowledgeBasePanel`, `SettingsPanel`.
 
-### Design System
+## Design System
 
 "Phosphor Noir" theme defined via CSS variables in `globals.css`. Key tokens: `--bg-void`/`--bg-deep`/`--bg-surface` backgrounds, `--accent-green: #00ff88` phosphor glow, `--accent-red`/`--accent-amber`/`--accent-cyan` for log levels. Utility classes: `text-phosphor`, `glass-panel`, `glow-border-hover`, `animate-float-up`, `scanlines`, `noise-bg`.
 
-### LLM Provider Setup
+## LLM Provider Setup
 
 `lib/llm.ts` uses `createOpenAI()` / `createAnthropic()` from AI SDK. For Anthropic-compatible endpoints (non-official), it:
 - Uses `authToken` instead of `apiKey`
 - Normalizes base URL to append `/v1`
 - Patches fetch to add missing `signature` field on thinking blocks (workaround for compatible endpoints that omit it)
 
-### RAG Integration
+## RAG Integration
 
 Both `/api/analyze` and `/api/chat` call the Python RAG service (`rag-service/`) before the LLM to retrieve knowledge base context. RAG is non-blocking — if the service is down or the KB is empty, analysis/chat proceeds without it.
 

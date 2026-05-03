@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+:root {
+  --bg-void: #030508;
+  --bg-deep: #070b12;
+  --bg-surface: #0c1119;
+  --bg-elevated: #111822;
+  --border-dim: #1a2233;
+  --border-mid: #243044;
+  --text-primary: #e2e8f0;
+  --text-secondary: #8899aa;
+  --text-muted: #4a5c70;
+  --accent-green: #00ff88;
+  --accent-green-dim: #00cc6a;
+  --accent-green-glow: rgba(0, 255, 136, 0.15);
+  --accent-red: #ff3b5c;
+  --accent-red-dim: rgba(255, 59, 92, 0.12);
+  --accent-amber: #ffb020;
+  --accent-amber-dim: rgba(255, 176, 32, 0.12);
+  --accent-cyan: #00d4ff;
+  --accent-cyan-dim: rgba(0, 212, 255, 0.10);
+  --font-display: "IBM Plex Mono", "Geist Mono", monospace;
+  --font-body: "IBM Plex Sans", "Geist Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "Geist Mono", monospace;
+}
+
+@theme inline {
+  --color-background: var(--bg-void);
+  --color-foreground: var(--text-primary);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+body {
+  background: var(--bg-void);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+}
+
+/* Scanline overlay */
+.scanlines::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+}
+
+/* Phosphor glow */
+@keyframes glow-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes scan-in {
+  0% { transform: translateY(4px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.8; }
+  94% { opacity: 1; }
+}
+
+@keyframes cursor-blink {
+  0%, 49% { border-color: var(--accent-green); }
+  50%, 100% { border-color: transparent; }
+}
+
+@keyframes float-up {
+  0% { transform: translateY(8px); opacity: 0; filter: blur(4px); }
+  100% { transform: translateY(0); opacity: 1; filter: blur(0); }
+}
+
+@keyframes progress-scan {
+  0% { left: -30%; }
+  100% { left: 100%; }
+}
+
+.animate-float-up {
+  animation: float-up 0.4s ease-out both;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.animate-flicker {
+  animation: flicker 4s linear infinite;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-deep);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-mid);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Noise texture overlay */
+.noise-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.025;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+}
+
+/* Glass panel */
+.glass-panel {
+  background: linear-gradient(
+    135deg,
+    rgba(12, 17, 25, 0.85),
+    rgba(17, 24, 34, 0.65)
+  );
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-dim);
+}
+
+/* Phosphor text */
+.text-phosphor {
+  color: var(--accent-green);
+  text-shadow: 0 0 8px rgba(0, 255, 136, 0.4), 0 0 20px rgba(0, 255, 136, 0.15);
+}
+
+/* Glowing border on hover */
+.glow-border-hover {
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.glow-border-hover:hover {
+  border-color: rgba(0, 255, 136, 0.3);
+  box-shadow: 0 0 12px rgba(0, 255, 136, 0.08), inset 0 0 12px rgba(0, 255, 136, 0.03);
+}
+
+/* Terminal cursor */
+.terminal-cursor::after {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 1.1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  border-right: 2px solid var(--accent-green);
+  animation: cursor-blink 1s step-end infinite;
+}
+
+/* Progress scan line */
+.progress-scan {
+  position: relative;
+  overflow: hidden;
+}
+.progress-scan::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 30%;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.15), transparent);
+  animation: progress-scan 1.5s ease-in-out infinite;
+}

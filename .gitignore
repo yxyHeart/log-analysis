@@ -23,14 +23,14 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# --- logscope ---
-logscope/node_modules/
-logscope/.next/
-logscope/out/
-logscope/build/
-logscope/.vercel/
-logscope/coverage/
-logscope/*.tsbuildinfo
+# --- Next.js app ---
+node_modules/
+.next/
+out/
+build/
+.vercel/
+coverage/
+*.tsbuildinfo
 
 # --- rag-service ---
 rag-service/.venv/
