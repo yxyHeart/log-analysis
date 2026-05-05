@@ -210,11 +210,25 @@ export default function KnowledgeBasePanel({ open, onClose, ragServiceUrl }: Kno
                     className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-surface)]/60 border border-[var(--border-dim)]"
                   >
                     <span className="text-[10px] font-mono text-[var(--text-muted)] shrink-0">
-                      {doc.sourceType === "file" ? "DOC" : "URL"}
+                      {doc.sourceType === "incident_report" ? "INC" : doc.sourceType === "file" ? "DOC" : "URL"}
                     </span>
                     <span className="text-[11px] font-mono text-[var(--text-primary)] truncate flex-1" title={doc.source}>
                       {doc.source}
                     </span>
+                    {doc.rootCauseCategory && (
+                      <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-[var(--accent-cyan)]/10 text-[var(--accent-cyan)] border border-[var(--accent-cyan)]/20 shrink-0">
+                        {doc.rootCauseCategory}
+                      </span>
+                    )}
+                    {doc.severity && (
+                      <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded shrink-0 ${
+                        doc.severity === "P0" ? "bg-[var(--accent-red)]/10 text-[var(--accent-red)] border border-[var(--accent-red)]/20" :
+                        doc.severity === "P1" ? "bg-[var(--accent-amber)]/10 text-[var(--accent-amber)] border border-[var(--accent-amber)]/20" :
+                        "bg-[var(--bg-surface)] text-[var(--text-muted)] border border-[var(--border-dim)]"
+                      }`}>
+                        {doc.severity}
+                      </span>
+                    )}
                     <span className="text-[9px] font-mono text-[var(--text-muted)] shrink-0">
                       {doc.chunkCount} chunks
                     </span>

@@ -19,10 +19,15 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    environment:
+      - ES_HOST=elasticsearch
+      - ES_PORT=9200
     volumes:
-      - rag-chroma-data:/app/chroma_data
       - rag-uploads:/app/uploads
       - rag-model-cache:/root/.cache/huggingface
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
@@ -32,8 +37,27 @@ services:
     networks:
       - logscope-net
 
+  elasticsearch:
+    image: elasticsearch:8.12.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - rag-es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - logscope-net
+
 volumes:
-  rag-chroma-data:
+  rag-es-data:
   rag-uploads:
   rag-model-cache:
 

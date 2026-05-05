@@ -465,21 +465,12 @@ export default function SettingsPanel({ open, onClose, onSettingsChange }: Setti
               RAG Pipeline
             </label>
             {/* Pipeline flow diagram */}
-            <div className="flex items-center gap-1 mb-3 px-1">
-              {ragUseQueryRewriting && (
-                <>
-                  <PipelineNode active={ragUseQueryRewriting} color="cyan" label="QRW" />
-                  <PipelineArrow />
-                </>
-              )}
+            <div className="flex items-center gap-1 mb-3 px-1 flex-wrap">
+              <PipelineNode active color="cyan" label="QA" />
+              <PipelineArrow />
               {ragUseHybrid ? (
                 <>
-                  <div className="flex flex-col gap-0.5 items-center">
-                    <PipelineNode active small color="green" label="BM25" />
-                    <PipelineNode active small color="green" label="VEC" />
-                  </div>
-                  <PipelineArrow />
-                  <PipelineNode active color="green" label="RRF" />
+                  <PipelineNode active color="green" label="HR" />
                 </>
               ) : (
                 <PipelineNode active color="green" label="VEC" />
@@ -490,8 +481,13 @@ export default function SettingsPanel({ open, onClose, onSettingsChange }: Setti
                   <PipelineNode active={ragUseReranker} color="amber" label="RER" />
                 </>
               )}
+              <PipelineArrow />
+              <PipelineNode active color="green" label="QG" />
               <PipelineArrow dim />
-              <PipelineNode active={false} color="green" label="OUT" />
+              <PipelineNode active={false} color="green" label="RG" />
+              {(ragUseHybrid || ragUseReranker || ragUseQueryRewriting) && (
+                <span className="text-[8px] font-mono text-[var(--accent-cyan)] ml-1">loop</span>
+              )}
             </div>
             <div className="space-y-1.5">
               <PipelineToggle

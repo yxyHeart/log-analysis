@@ -8,15 +8,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `rag-service/` — Python FastAPI microservice for RAG (knowledge base). Uses sentence-transformers + ChromaDB.
 - `docs/superpowers/specs/` — Product design specs in Chinese (architecture, UI/UX, validation criteria)
 
+## Runtime Requirements
+
+- **Node.js 22+** (Docker uses `node:22-alpine`)
+- **Python 3.12** for rag-service (Docker uses `python:3.12-slim`)
+
 ## Breaking-Change Notes
 
 This project uses versions with breaking changes from what training data may suggest. Always check before using patterns from older versions:
 
 - **Next.js 16** — Read `node_modules/next/dist/docs/` before using unfamiliar APIs. This version has breaking changes from Next.js 14/15.
-- **Vercel AI SDK v6** — Use `createOpenAI()` / `createAnthropic()` for provider instances (not `openai()` directly). The analyze API uses `generateObject` (not `streamObject`). The chat API uses `streamText` with `.toTextStreamResponse()`.
+- **Vercel AI SDK v6** — Use `createOpenAI()` / `createAnthropic()` for provider instances (not `openai()` directly). The analyze API uses `generateObject` (not `streamObject`). The chat/thinking APIs use `streamText` with `.toTextStreamResponse()`.
 - **Tailwind CSS v4** — Uses `@import "tailwindcss"` syntax and `@theme inline` for custom tokens (no `tailwind.config.js`).
 - **React 19** — No legacy context patterns.
 - **Zod v4** — Bundled with AI SDK, used for structured output schema in analyze API.
+- **motion** (Framer Motion v12) — Used for UI animations (not `framer-motion` package name).
 
 ## Commands
 
@@ -48,6 +54,7 @@ Raw log text → detector.ts → parser.ts → splitter.ts → /api/analyze (gen
 
 **API routes:**
 - `app/api/analyze/route.ts` — `generateObject` with zod schema (`analysisSchema`), handles chunked merge flow
+- `app/api/analyze/thinking/route.ts` — `streamText` for quick-thinking overview (single chunk only, no merge)
 - `app/api/chat/route.ts` — `streamText` with log+analysis context, returns `.toTextStreamResponse()`
 - `app/api/test-connection/route.ts` — Connection validation
 
@@ -68,8 +75,8 @@ Raw log text → detector.ts → parser.ts → splitter.ts → /api/analyze (gen
 
 Both `/api/analyze` and `/api/chat` call the Python RAG service (`rag-service/`) before the LLM to retrieve knowledge base context. RAG is non-blocking — if the service is down or the KB is empty, analysis/chat proceeds without it.
 
-- `lib/rag.ts` — Client module for RAG service HTTP calls (search, upload, list, delete)
-- `lib/types.ts` — `KBDocument`, `RAGResult` types for RAG data
+- `lib/rag.ts` — Client module for RAG service HTTP calls (search, upload, list, delete, incident report upload, assertion evaluation)
+- `lib/types.ts` — `KBDocument`, `RAGResult`, `RootCauseMetadata`, `RAGCheckerMetrics`, `PipelineTrace` types for RAG data
 - `lib/prompts.ts` — Both `buildAnalysisPrompt` and `buildChatPrompt` accept optional `ragContext` parameter
 - RAG service URL is configurable in Settings (default `http://localhost:8000`)
 
@@ -79,52 +86,54 @@ Both `/api/analyze` and `/api/chat` call the Python RAG service (`rag-service/`)
 
 ```bash
 cd rag-service
-pip install -r requirements.txt   # Install dependencies
+pip install -r requirements.txt   # Install dependencies (requires Elasticsearch running)
 uvicorn app.main:app --port 8000  # Start dev server
 ```
 
 ### Architecture
 
-- FastAPI app with `/documents/upload`, `/documents/url`, `/documents`, `/documents/{doc_id}`, `/search`, `/search/evaluate`, `/health` endpoints
+- FastAPI app with `/documents/upload`, `/documents/url`, `/documents/incident`, `/documents`, `/documents/{doc_id}`, `/search`, `/search/evaluate`, `/search/evaluate/assertion`, `/health` endpoints
 - `all-MiniLM-L6-v2` embedding model (384-dim, CPU-only)
-- ChromaDB with `PersistentClient` for vector storage (single collection `logscope_kb`)
-- Vector data persisted in `rag-service/chroma_data/` (gitignored)
-- Paragraph-aware chunking (~500 tokens, 50-token overlap) via `services/chunking.py`
+- **Elasticsearch 8.x** for vector storage + native BM25 + hybrid search with RRF (replaces ChromaDB + rank-bm25)
+- ES index `logscope_kb` with dense_vector (384-dim cosine), keyword, text, and metadata fields
+- **Semantic-aware chunking** (~500 tokens, 50-token overlap) with 3-priority separators, bracket balance detection, and metadata injection via `services/chunking.py`
+- Metadata extraction: root cause category, affected services, error type, severity, call chain via `services/metadata_extractor.py`
 - URL crawling via `httpx` + `beautifulsoup4`
-- BM25 index rebuilt from ChromaDB at startup (`services/bm25.py`)
 
-**Search pipeline** (in `routes/search.py`): supports simple vector search or a multi-stage hybrid pipeline:
-1. Query rewriting — LLM-based query expansion (`services/query_rewriter.py`), optional, requires `llm_config`
-2. Hybrid retrieval — parallel BM25 (`services/bm25.py`) + vector search, fused via reciprocal rank fusion (`services/fusion.py`)
-3. Reranking — cross-encoder rerank of top candidates (`services/reranker.py`), optional
+**Search pipeline** — two modes:
 
-All stages are controlled by flags on the `SearchRequest`: `use_hybrid`, `use_reranker`, `use_query_rewriting`.
+1. **LangGraph state machine** (when hybrid/reranker/query-rewriting enabled): `Query_Analysis → Hybrid_Retrieval → Rerank → Quality_Gate → Response_Generation`. Quality gate can loop back to Query_Analysis (max 2 attempts) when retrieval quality is low.
+2. **Legacy linear** (simple vector-only search): `vector search → top-K`
 
-`/search/evaluate` runs the pipeline against labeled data and computes recall/MRR/nDCG (`services/evaluation.py`).
+Both pipelines use ES native `knn + match + rank.rrf` for hybrid retrieval. The LangGraph pipeline is in `services/graph.py` with nodes in `services/nodes/`.
+
+`/search/evaluate` runs document-level evaluation (recall/MRR/nDCG). `/search/evaluate/assertion` runs RAGChecker-style assertion-level evaluation (claim recall/precision/F1/faithfulness).
 
 ### Key Files
 
-- `app/main.py` — FastAPI app setup, CORS, ChromaDB + BM25 lifecycle
-- `app/routes/documents.py` — KB document management (CRUD + upload/URL ingestion)
-- `app/routes/search.py` — Search pipeline (hybrid, reranking, evaluation)
-- `app/services/embedding.py` — Sentence transformer wrapper
-- `app/services/chunking.py` — Text splitting for uploads
-- `app/services/bm25.py` — BM25 keyword search index
-- `app/services/fusion.py` — Reciprocal rank fusion for hybrid results
-- `app/services/reranker.py` — Cross-encoder reranking
-- `app/services/query_rewriter.py` — LLM query expansion
-- `app/services/evaluation.py` — Search quality metrics (recall, MRR, nDCG)
-- `app/services/crawler.py` — URL content extraction
+- `app/main.py` — FastAPI app setup, CORS, Elasticsearch lifecycle
+- `app/routes/` — `documents.py` (CRUD + upload/URL/incident), `search.py` (search pipeline + evaluation)
+- `app/services/` — `embedding.py`, `chunking.py`, `elasticsearch.py`, `es_client.py`, `metadata_extractor.py`, `reranker.py`, `query_rewriter.py`, `evaluation.py`, `rag_checker.py`, `crawler.py`, `graph.py`
+- `app/services/nodes/` — `query_analysis.py`, `hybrid_retrieval.py`, `rerank_node.py`, `quality_gate.py`, `response_generation.py`
 - `app/models/schemas.py` — Pydantic request/response types
 
 ## Running with Docker
 
 ```bash
-docker compose up        # Starts both logscope (port 3000) and rag-service (port 8000)
-docker compose up rag-service  # Run only the RAG service for local dev
+docker compose up        # Starts logscope (3000), rag-service (8000), and elasticsearch (9200)
+docker compose up rag-service  # Run only the RAG service + ES for local dev
 ```
 
-Docker Compose uses named volumes for `rag-chroma-data`, `rag-uploads`, and `rag-model-cache` (HuggingFace model cache). The rag-service has a health check (`/health`) that logscope depends on before starting. Both services communicate on the `logscope-net` bridge network; logscope reaches RAG at `http://rag-service:8000` (overridden via `RAG_SERVICE_URL` env var).
+Docker Compose uses named volumes for `rag-es-data`, `rag-uploads`, and `rag-model-cache` (HuggingFace model cache). Elasticsearch runs on port 9200 with single-node discovery and security disabled. The rag-service depends on ES health check before starting. Both services communicate on the `logscope-net` bridge network; rag-service reaches ES at `http://elasticsearch:9200` (via `ES_HOST`/`ES_PORT` env vars).
+
+## Environment Variables
+
+| Variable | Where | Default | Purpose |
+|---|---|---|---|
+| `RAG_SERVICE_URL` | Next.js (docker) | `http://localhost:8000` | RAG service endpoint; set to `http://rag-service:8000` in Docker |
+| `ES_HOST` | rag-service (docker) | `localhost` | Elasticsearch host; set to `elasticsearch` in Docker |
+| `ES_PORT` | rag-service (docker) | `9200` | Elasticsearch port |
+| Provider config (apiKey, baseUrl, model) | Browser localStorage | — | Set via SettingsPanel, passed per-request to API routes |
 
 ## Design Spec
 

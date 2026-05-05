@@ -11,6 +11,9 @@ Thumbs.db
 
 # Claude Code
 .claude/
+.agents/
+.continue/
+.trae/
 
 # Env files
 .env

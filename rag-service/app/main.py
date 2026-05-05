@@ -1,26 +1,21 @@
 from contextlib import asynccontextmanager
 
-import chromadb
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes import documents, search
 from app.services.embedding import get_model
-from app.services.bm25 import BM25Service
+from app.services.es_client import get_client, ensure_index
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Load embedding model on startup
     get_model()
-    # Initialize ChromaDB
-    app.state.chroma_client = chromadb.PersistentClient(path="./chroma_data")
-    # Initialize BM25 service and rebuild from existing ChromaDB data
-    bm25_service = BM25Service()
-    collection = app.state.chroma_client.get_or_create_collection("logscope_kb")
-    if not bm25_service.index and collection.count() > 0:
-        bm25_service.rebuild_from_collection(collection)
-    app.state.bm25_service = bm25_service
+    # Initialize Elasticsearch
+    es = get_client()
+    await ensure_index(es)
+    app.state.es_client = es
     yield
 
 

@@ -45,12 +45,27 @@ export interface AnalysisResult {
   suggestions: FixSuggestion[];
 }
 
+// Root cause analysis metadata
+export interface RootCauseMetadata {
+  rootCauseCategory?: string;
+  affectedServices?: string[];
+  errorType?: string;
+  severity?: string;
+  callChain?: string;
+  stackTracePresent?: boolean;
+  resolutionStatus?: string;
+  semanticSummary?: string;
+}
+
 export interface KBDocument {
   docId: string;
   source: string;
-  sourceType: "file" | "url";
+  sourceType: "file" | "url" | "incident_report";
   chunkCount: number;
   uploadDate: string;
+  rootCauseCategory?: string;
+  affectedServices?: string[];
+  severity?: string;
 }
 
 export type RetrieverSource = "vector" | "bm25" | "reranker" | "both";
@@ -61,4 +76,30 @@ export interface RAGResult {
   sourceType: string;
   score: number;
   retriever?: RetrieverSource;
+  metadata?: RootCauseMetadata;
+}
+
+// RAGChecker assertion-level metrics
+export interface RAGCheckerMetrics {
+  claimRecall: number;
+  claimPrecision: number;
+  claimF1: number;
+  faithfulness: number;
+  totalAssertions: number;
+  supportedCount: number;
+  contradictedCount: number;
+  unverifiableCount: number;
+  documentRecall: number;
+  documentMrr: number;
+  documentNdcg: number;
+}
+
+// LangGraph pipeline trace
+export interface PipelineTrace {
+  steps: string[];
+  totalLatencyMs: number;
+  qualityScore: number;
+  qualityPassed: boolean;
+  rewriteAttempts: number;
+  queryIntent: string;
 }
